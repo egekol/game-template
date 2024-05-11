@@ -2,11 +2,13 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Pool;
+using UnityEngine.Serialization;
+
 namespace Utilities
 {
 	public class ParticlePool :  Singleton<ParticlePool>
 	{
-		[SerializeField] private List<ParticleClass> particles = new List<ParticleClass>();
+		[SerializeField] private List<ParticleClass> _particles = new();
 		private Dictionary<string,ObjectPool<ParticleSystem>> _particleDictionary;
 
 		private void Awake()
@@ -19,9 +21,9 @@ namespace Utilities
 		{
 			if(!Application.isPlaying)
 			{
-				for(int i = 0; i < particles.Count; i++)
+				for(int i = 0; i < _particles.Count; i++)
 				{
-					ParticleClass particleClass = particles[i];
+					ParticleClass particleClass = _particles[i];
 					if(particleClass.prefab.Equals(null)) continue;
 					var main = particleClass.prefab.main;
 					main.stopAction = ParticleSystemStopAction.Disable;
@@ -35,13 +37,14 @@ namespace Utilities
 
 		private void CreateAtStart()
 		{
-			for(int i = 0; i < particles.Count; i++)
+			for(int i = 0; i < _particles.Count; i++)
 			{
-				ParticleClass p = particles[i];
+				ParticleClass p = _particles[i];
 				if(!p.createAtStart) continue;
 				for(int j = 0; j < p.softCap; j++)
 				{
-					_particleDictionary[p.tag].Get();
+					var particle=_particleDictionary[p.tag].Get();
+					particle.transform.SetParent(transform);
 				}
 			}
 		}
@@ -49,13 +52,13 @@ namespace Utilities
 		private void Initialize()
 		{
 			_particleDictionary = new Dictionary<string,ObjectPool<ParticleSystem>>();
-			int listCount = particles.Count;
+			int listCount = _particles.Count;
 			for(int i = 0; i < listCount; i++)
 			{
 				ObjectPool<ParticleSystem> pool = new ObjectPool<ParticleSystem>(CreateFunction(i),OnParticleGet,
 					OnParticleRelease,OnParticleDestroy,true,
-					particles[i].softCap,particles[i].hardCap);
-				string prefabName = particles[i].tag;
+					_particles[i].softCap,_particles[i].hardCap);
+				string prefabName = _particles[i].tag;
 				_particleDictionary.Add(prefabName,pool);
 			}
 		}
@@ -124,7 +127,8 @@ namespace Utilities
 
 		private void OnParticleGet(ParticleSystem particle)
 		{
-			particle.gameObject.SetActive(true);
+			particle.transform.SetParent(transform);
+			// particle.gameObject.SetActive(true);
 		}
 
 		private void ChangeParticleColor(ParticleSystem particle,Color color)
@@ -145,9 +149,9 @@ namespace Utilities
 		{
 			return () =>
 			{
-				ParticleSystem particle = Instantiate(particles[i].prefab);
+				ParticleSystem particle = Instantiate(_particles[i].prefab);
 				ParticleCallBack callBack = particle.GetComponent<ParticleCallBack>();
-				callBack.particleTag = particles[i].tag;
+				callBack.particleTag = _particles[i].tag;
 				return particle;
 			};
 		}
@@ -155,6 +159,7 @@ namespace Utilities
 		private void OnParticleRelease(ParticleSystem particle)
 		{
 			particle.gameObject.SetActive(false);
+			particle.transform.SetParent(transform);
 		}
 
 		private void OnParticleDestroy(ParticleSystem particle)
